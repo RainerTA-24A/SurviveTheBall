@@ -3,10 +3,7 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Movement")]
     public float speed = 10f;
-
-    [Header("Jump")]
     public float jumpForce = 5f;
     public float jumpHoldForce = 12f;
     public float maxJumpHoldTime = 1.5f;
@@ -15,71 +12,73 @@ public class PlayerController : MonoBehaviour
     private bool isGrounded;
     private bool isHoldingJump;
     private float jumpHoldTimer;
+    private Transform cam;
 
-    void Start()
+    private void Start()
     {
         rb = GetComponent<Rigidbody>();
 
-        if (rb == null)
+        if (Camera.main != null)
         {
-            Debug.LogError("PlayerController requires a Rigidbody!");
+            cam = Camera.main.transform;
         }
     }
 
-    void Update()
+    private void Update()
     {
-        // Alusta hüpet ainult maapinnal olles
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-
             isGrounded = false;
             isHoldingJump = true;
             jumpHoldTimer = 0f;
         }
 
-        // Hoia hüppe lisajõudu aktiivsena ainult piiratud aja
-        if (isHoldingJump)
+        if (Input.GetKey(KeyCode.Space) && isHoldingJump)
         {
-            if (Input.GetKey(KeyCode.Space) &&
-                jumpHoldTimer < maxJumpHoldTime)
-            {
-                jumpHoldTimer += Time.deltaTime;
-            }
-            else
+            jumpHoldTimer += Time.deltaTime;
+
+            if (jumpHoldTimer >= maxJumpHoldTime)
             {
                 isHoldingJump = false;
             }
         }
+
+        if (Input.GetKeyUp(KeyCode.Space))
+        {
+            isHoldingJump = false;
+        }
     }
 
-    void FixedUpdate()
+    private void FixedUpdate()
     {
-        if (rb == null) return;
+        if (cam == null && Camera.main != null)
+        {
+            cam = Camera.main.transform;
+        }
 
-        // WASD ja nooleklahvid
-        float moveHorizontal = Input.GetAxis("Horizontal");
-        float moveVertical = Input.GetAxis("Vertical");
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
 
-        Vector3 movement = new Vector3(
-            moveHorizontal,
-            0f,
-            moveVertical
-        );
+        Vector3 forward = cam != null ? cam.forward : Vector3.forward;
+        Vector3 right = cam != null ? cam.right : Vector3.right;
 
+        forward.y = 0f;
+        right.y = 0f;
+
+        forward.Normalize();
+        right.Normalize();
+
+        Vector3 movement = (right * horizontal + forward * vertical).normalized;
         rb.AddForce(movement * speed);
 
-        // Lisajõud Space'i hoidmise ajal
         if (isHoldingJump && jumpHoldTimer < maxJumpHoldTime)
         {
-            rb.AddForce(
-                Vector3.up * jumpHoldForce,
-                ForceMode.Acceleration
-            );
+            rb.AddForce(Vector3.up * jumpHoldForce);
         }
     }
 
-    void OnCollisionEnter(Collision collision)
+    private void OnCollisionStay(Collision collision)
     {
         if (collision.gameObject.CompareTag("Ground"))
         {
@@ -87,15 +86,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void OnCollisionStay(Collision collision)
-    {
-        if (collision.gameObject.CompareTag("Ground"))
-        {
-            isGrounded = true;
-        }
-    }
-
-    void OnCollisionExit(Collision collision)
+    private void OnCollisionExit(Collision collision)
     {
         if (collision.gameObject.CompareTag("Ground"))
         {
